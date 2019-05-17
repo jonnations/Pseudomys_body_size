@@ -1,0 +1,766 @@
+---
+title: "20190516_log_env_variables_GitHub"
+author: "Nations"
+date: "5/16/1019"
+output: html_document
+---
+### This script estimates the effect of environmental variables on log-transformed body mass
+This includes individual variables as well as interactions
+
+Set working directory here
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = "/User.....")
+```
+
+Required packages
+```{r, message=FALSE}
+library(tidyverse)
+library(phytools)
+library(geiger)
+library(brms)
+getwd()
+```
+Reading in data.
+
+#### Center scaling all of the variables to make the interaction models more interpretable
+```{r}
+tree <- read.tree("Pseudomys_Division_Tree.nwk")
+tree <- drop.tip(tree, "Pseudomys_pedunculatus")
+dat <- read.csv("Pseudomys_division_data.csv", header=TRUE,row.names=1, stringsAsFactors=FALSE)
+dat$log_mass <-log(dat$mass)
+dat$cmass <- dat$mass - mean(dat$mass)
+dat$temp <- dat$l_temp - mean(dat$l_temp)
+dat$ar <- dat$l_ar - mean(dat$l_ar)
+dat$pam <- dat$l_pam - mean(dat$l_pam)
+dat$el <- dat$l_el - mean(dat$l_el)
+dat$pas <- dat$l_pas - mean(dat$l_pas)
+dat$pwm <- dat$l_pwm - mean(dat$l_pwm)
+dat$tar <- dat$l_tar - mean(dat$l_tar)
+dat$npp <- dat$l_npp - mean(dat$l_npp)
+dat$lat <- dat$latitude - mean(dat$latitude)
+#data$st <- scale(data$Temperature_annual_mean)
+```
+
+phylo data
+```{r}
+inv.phylo <- MCMCglmm::inverseA(tree, nodes = "TIPS", scale = TRUE)
+A <- solve(inv.phylo$Ainv)
+rownames(A) <- rownames(inv.phylo$Ainv)
+```
+
+#### Linear regression with categorial dependent variables (habitat) and phylo
+This is a single model for all the 7 non-correlated variables
+This includes measurement error
+
+####Temperature Annual Mean
+```{r, message = FALSE}
+g.tam <- brm(
+  log_mass ~ 1 + me(temp, sdx = temp_lsd) + (1 + me(temp, sdx = temp_lsd)|group) + (1|phylo), 
+  data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "metempsdxEQtemp_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+  file = "20190426_log_tam.Rds"
+)
+#g.tam <- add_criterion(g.tam, criterion = c("loo", "waic", "kfold"), overwrite = T)
+```
+
+
+```{r}
+summary(g.tam)
+plot(g.tam, ask = F)
+plot(marginal_effects(g.tam), points = T)
+```
+
+#### Precipitation Annual Mean
+```{r, message = FALSE}
+g.pam <- brm(
+  log_mass ~ 1 + me(pam, pam_lsd) + (1 + me(pam, pam_lsd)|group) + (1|phylo), 
+  #log_mass ~ 1 + me(precip, precip_lsd) + (1 + me(precip, precip_lsd)|group), 
+  data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepampam_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+  file = "20190426_log_pam.Rds"
+)
+#g.pam <- add_criterion(g.pam, criterion = c("loo", "waic", "kfold"), overwrite = T)
+```
+
+```{r}
+summary(g.pam)
+plot(g.pam, ask = F)
+plot(marginal_effects(g.pam), points = T)
+```
+
+
+#### elevation
+```{r, message = FALSE}
+g.el <- brm(
+  log_mass ~ 1 + me(el, el_lsd) + (1 + me(el, el_lsd)|group) + (1|phylo), 
+  data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "meelel_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+  file = "20190426_log_el.Rds"
+)
+#g.el <- add_criterion(g.el, criterion = c("loo", "waic", "kfold"), overwrite = T)
+```
+
+```{r}
+summary(g.el)
+plot(g.el, ask = F)
+plot(marginal_effects(g.el), points = T)
+```
+
+
+#### Aridity Index
+```{r, message = FALSE}
+g.ar <- brm(
+  log_mass ~ 1 + me(ar, ar_lsd) + (1 + me(ar, ar_lsd)|group) + (1|phylo), 
+  #log_mass ~ 1 + me(aridity, aridity_lsd) + (1 + me(aridity, aridity_lsd)|group), 
+  data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mearar_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+  file = "20190426_log_ar.Rds"
+)
+#g.ar <- add_criterion(g.ar, criterion = c("loo", "waic", "kfold"), overwrite = T)
+```
+
+```{r}
+summary(g.ar)
+plot(g.ar, ask = F)
+plot(marginal_effects(g.ar), points = T)
+```
+
+
+
+####Precip Wettest Month
+```{r, message = FALSE}
+g.pwm <- brm(
+  log_mass ~ 1 + me(pwm, pwm_lsd) + (1 + me(pwm, pwm_lsd)|group) + (1|phylo), 
+  #log_mass ~ 1 + me(pwmidity, pwmidity_lsd) + (1 + me(pwmidity, pwmidity_lsd)|group), 
+  data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepwmpwm_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+  file = "20190426_log_pwm.Rds"
+)
+#g.pwm <- add_criterion(g.pwm, criterion = c("loo", "waic", "kfold"), overwrite = T)
+```
+
+
+```{r}
+summary(g.pwm)
+plot(g.pwm, ask = F)
+plot(marginal_effects(g.pwm), points = T)
+```
+
+
+####Temperature Annual Range
+```{r, message = FALSE}
+g.tar <- brm(
+  log_mass ~ 1 + me(tar, tar_lsd) + (1 + me(tar, tar_lsd)|group) + (1|phylo), 
+  #log_mass ~ 1 + me(tamidity, tamidity_lsd) + (1 + me(tamidity, tamidity_lsd)|group), 
+  data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "metartar_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+  file = "20190426_log_tar.Rds"
+)
+#g.tam <- add_criterion(g.tam, criterion = c("loo", "waic", "kfold"), overwrite = T)
+```
+
+
+```{r}
+summary(g.tar)
+plot(g.tar, ask = F)
+plot(marginal_effects(g.tar), points = T)
+```
+
+
+####Precipitation Annual Seasonality Ratio
+```{r, message = FALSE}
+g.pas <- brm(
+  log_mass ~ 1 + me(pas, pas_lsd) + (1 + me(pas, pas_lsd)|group) + (1|phylo), 
+  #log_mass ~ 1 + me(pasidity, pasidity_lsd) + (1 + me(pasidity, pasidity_lsd)|group), 
+  data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepaspas_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+  file = "20190426_log_pas.Rds"
+)
+#g.pas <- add_criterion(g.pas, criterion = c("loo", "waic", "kfold"), overwrite = T)
+```
+
+
+```{r}
+summary(g.pas)
+plot(g.pas, ask = F)
+plot(marginal_effects(g.pas), points = T)
+```
+
+```{r, message = FALSE}
+g.npp <- brm(
+  log_mass ~ 1 + me(npp, npp_lsd) + (1 + me(npp, npp_lsd)|group) + (1|phylo), 
+  #log_mass ~ 1 + me(pasidity, pasidity_lsd) + (1 + me(pasidity, pasidity_lsd)|group), 
+  data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "menppnpp_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+  file = "20190426_log_npp.Rds"
+)
+#g.npp <- add_criterion(g.npp, criterion = c("loo", "waic", "kfold"), overwrite = T)
+```
+
+```{r}
+summary(g.npp)
+plot(g.npp, ask = F)
+plot(marginal_effects(g.npp), points = T)
+```
+
+Gotta add in g.lat
+```{r}
+g.lat <- brm(
+  log_mass ~ 1 + me(lat, lat_sd) + (1 + me(lat, lat_sd)|group) + (1|phylo), 
+  #log_mass ~ 1 + me(pasidity, pasidity_lsd) + (1 + me(pasidity, pasidity_lsd)|group), 
+  data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "melatlat_sd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+  file = "20190426_lat.Rds"
+)
+```
+
+```{r}
+summary(g.lat)
+plot(g.lat, ask = F)
+plot(marginal_effects(g.lat), points = T)
+```
+
+##Interactions
+These are models of the interactions between two variables
+
+####Precip Annual Mean and Temperature Annual Mean
+```{r, message = FALSE}
+i.pamtam <- brm(
+ log_mass ~  me(pam, pam_lsd)*me(temp, temp_lsd) + (1 + me(pam, pam_lsd)*me(temp, temp_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepampam_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "metemptemp_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+  file = "20190426_log_i_pamtam.Rds"
+)
+```
+
+```{r}
+summary(i.pamtam)
+plot(i.pamtam, ask = F)
+#plot(marginal_effects(i.pamtam, effects = "pam"), points = T)
+#plot(marginal_effects(c.tam))
+```
+
+
+#### Precip Annual Mean and Precip Wettest Month
+```{r, message = FALSE}
+i.pampwm <- brm(
+ log_mass ~  me(pam, pam_lsd)*me(pwm, pwm_lsd) + (1 + me(pam, pam_lsd)*me(pwm, pwm_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepampam_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepwmpwm_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_pampwm.Rds"
+)
+```
+
+
+
+```{r}
+summary(i.pampwm)
+plot(i.pampwm, ask = F)
+#plot(marginal_effects(i.pampwm, effects = "pam:pwm"), points = T)
+#plot(marginal_effects(c.tam))
+```
+
+
+#### Precip Annual Mean and Temperature Annual Range
+```{r, message = FALSE}
+i.pamtar <- brm(
+ log_mass ~  me(pam, pam_lsd)*me(tar, tar_lsd) + (1 + me(pam, pam_lsd)*me(tar, tar_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepampam_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "metartar_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_pamtar.Rds"
+)
+```
+
+
+```{r}
+summary(i.pamtar)
+plot(i.pamtar, ask = F)
+#plot(marginal_effects(i.pamtar, effects = "pam:tar"), points = T)
+#plot(marginal_effects(c.tam))
+```
+
+
+
+#### Precip Wettest Month and Temperature Annual Range
+```{r, message = FALSE}
+i.pwmtar <- brm(
+ log_mass ~  me(pwm, pwm_lsd)*me(tar, tar_lsd) + (1 + me(pwm, pwm_lsd)*me(tar, tar_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepwmpwm_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "metartar_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_pwmtar.Rds"
+)
+```
+
+
+```{r}
+summary(i.pwmtar)
+plot(i.pwmtar, ask = F)
+#plot(marginal_effects(i.pwmtar, effects = "pwm:tar"), points = T)
+#plot(marginal_effects(c.tam))
+```
+
+
+#### Precip Wettest Month and Temp Annual Mean
+```{r, message = FALSE}
+i.pwmtam <- brm(
+ log_mass ~  me(pwm, pwm_lsd)*me(temp, temp_lsd) + (1 + me(pwm, pwm_lsd)*me(temp, temp_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepwmpwm_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "metemptemp_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_pwmtam.Rds"
+)
+```
+
+
+```{r}
+summary(i.pwmtam)
+plot(i.pwmtam, ask = F)
+#plot(marginal_effects(i.pwmtam, effects = "pwm:temp"), points = T)
+#plot(marginal_effects(i.pwmtam))
+```
+
+
+#### Temperature Annual Range and Temperature Annual Mean
+```{r, message = FALSE}
+i.tartam <- brm(
+ log_mass ~  me(tar, tar_lsd)*me(temp, temp_lsd) + (1 + me(tar, tar_lsd)*me(temp, temp_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "metartar_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "metemptemp_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_tartam.Rds"
+)
+```
+
+```{r}
+summary(i.tartam)
+plot(i.tartam, ask = F)
+#plot(marginal_effects(i.tartam, effects = "tar:temp"), points = T)
+```
+
+
+#### Net Primary Productivity and Temperature Annual Mean
+```{r, message = FALSE}
+i.npptam <- brm(
+ log_mass ~  me(npp, npp_lsd)*me(temp, temp_lsd) + (1 + me(npp, npp_lsd)*me(temp, temp_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "menppnpp_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "metemptemp_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_npptam.Rds"
+)
+```
+
+```{r}
+summary(i.npptam)
+plot(i.npptam, ask = F)
+#plot(marginal_effects(i.npptam, effects = "npp:temp"), points = T)
+#plot(marginal_effects(c.tam))
+```
+
+
+#### Net Primary Productivity and Precip Annual Mean
+```{r, message = FALSE}
+i.npppam <- brm(
+ log_mass ~  me(npp, npp_lsd)*me(pam, pam_lsd) + (1 + me(npp, npp_lsd)*me(pam, pam_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "menppnpp_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepampam_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_npppam.Rds"
+)
+```
+
+```{r}
+summary(i.npppam)
+plot(i.npppam, ask = F)
+#plot(marginal_effects(i.npppam, effects = "npp:pam"), points = T)
+#plot(marginal_effects(c.tam))
+```
+
+
+####Aridity: Temp annual mean
+```{r}
+i.artam <- brm(
+ log_mass ~  me(ar, ar_lsd)*me(temp, temp_lsd) + (1 + me(ar, ar_lsd)*me(temp, temp_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mearar_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "metemptemp_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_artam.Rds"
+)
+```
+
+
+```{r}
+summary(i.artam)
+plot(i.artam, ask = F)
+#plot(marginal_effects(i.artam, effects = "ar:tam"), points = T)
+```
+
+
+#### Aridity : Precip Wettest Month
+```{r}
+i.arpwm <- brm(
+ log_mass ~  me(ar, ar_lsd)*me(pwm, pwm_lsd) + (1 + me(ar, ar_lsd)*me(pwm, pwm_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mearar_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepwmpwm_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_arpwm.Rds"
+)
+```
+
+
+```{r}
+summary(i.arpwm)
+plot(i.arpwm, ask = F)
+#plot(marginal_effects(i.arpwm, effects = "ar:pwm"), points = T)
+```
+
+
+
+arnpp
+
+#### Aridity : Net Primary Production
+```{r}
+i.arnpp <- brm(
+ log_mass ~  me(ar, ar_lsd)*me(npp, npp_lsd) + (1 + me(ar, ar_lsd)*me(npp, npp_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mearar_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "menppnpp_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_arnpp.Rds"
+)
+```
+
+
+```{r}
+summary(i.arnpp)
+plot(i.arnpp, ask = F)
+#plot(marginal_effects(i.arnpp, effects = "ar:npp"), points = T)
+```
+
+
+
+#### Aridity : Precip Annual Mean
+```{r}
+i.arpam <- brm(
+ log_mass ~  me(ar, ar_lsd)*me(pam, pam_lsd) + (1 + me(ar, ar_lsd)*me(pam, pam_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mearar_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mepampam_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_arpam.Rds"
+)
+```
+
+
+```{r}
+summary(i.arpam)
+plot(i.arpam, ask = F)
+#plot(marginal_effects(i.arpam, effects = "ar:pam"), points = T)
+```
+
+
+#### Aridity : Temp annual range
+
+```{r}
+i.artar <- brm(
+ log_mass ~  me(ar, ar_lsd)*me(tar, tar_lsd) + (1 + me(ar, ar_lsd)*me(tar, tar_lsd)|group) + (1 | phylo), 
+ data = dat, 
+  family = gaussian(link = "identity"), cov_ranef = list(phylo = A),
+  iter = 5000, 
+prior = c(
+   set_prior("normal(0,5)", class = "b"),
+   set_prior("normal(0,5)", class = "Intercept"),
+   set_prior("normal(0,5)", class = "sd", coef = "Intercept", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "mearar_lsd", group = "group"),
+   set_prior("normal(0,5)", class = "sd", coef = "metartar_lsd", group = "group"),
+   set_prior("student_t(3,0.5,20)", class = "sd", coef = "Intercept", group = "phylo"),
+   set_prior("lkj(2)", class = "cor"),
+   #set_prior("normal(0,5)", class = "sigma")),
+   set_prior("chi_square(10)", class = "sigma")),
+  save_mevars = T,
+  control = list(adapt_delta = 0.99, max_treedepth = (15)),
+  cores = parallel::detectCores(),
+   file = "20190426_log_i_artar.Rds"
+)
+```
+
+
+```{r}
+summary(i.artar)
+plot(i.artar, ask = F)
+#plot(marginal_effects(i.artar, effects = "ar:tar"), points = T)
+```
