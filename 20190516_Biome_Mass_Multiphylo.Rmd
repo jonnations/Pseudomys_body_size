@@ -29,6 +29,7 @@ Acquire and mean center data
 
 load tree and trees, and subsample
 ```{r}
+tree <- read.tree("Pseudomys_Division_Tree.nwk")
 trees <- read.nexus("5000_Posterior.trees")
 tree_samp <- sample(trees, size = 100)
 
